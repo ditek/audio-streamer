@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <script src="YUVCanvas.js"></script>
+</head>
+
+<body>
+    <div>
+        <button id="openbtn">Open</button>
+    </div>
+</body>
+<script>
+decoder = new Worker('worker.js');
+
+var ws = null;
+var uri = document.getElementById('uri');
+var openBtn = document.getElementById('openbtn');
+
+
+
+
+openBtn.onclick = function(e) {
+    // startDecode(uri.value)
+
+    url = "ws://" + window.location.host + "/ws";
+    ws = new WebSocket(url);
+    console.log("Websocket connected: " + url);
+    // ws.send("Hello");
+    ws.binaryType = 'blob';
+    // ws.onmessage = (event) => { console.log(event.data) };
+    ws.onmessage = (event) => { play_audio(event.data);
+    console.log(ws.bufferedAmount); };
+    ws.onerror = (event) => console.log("WS Error:", event);
+    ws.onclose = (event) => console.log("WS Closed:", event);
+}
+
+var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+// Stereo
+var channels = 1;
+var sampleRate = 16000;
+// Create an empty two second stereo buffer at the sample rate of the AudioContext
+var frameCount = sampleRate * 2.0;
+
+function play_audio(data) {
+    var reader = new FileReader();
+    reader.readAsArrayBuffer(data);
+    reader.addEventListener("loadend", function (e) {
+        var buffer = (new Uint8Array(e.target.result));  // arraybuffer object
+        var bufferFloat = new Float32Array(buffer.length);
+        buffer.forEach((v, i) => bufferFloat[i] = (v - 128) / 128);
+        
+        // console.log(bufferFloat, buffer);
+        // var myArrayBuffer = audioCtx.createBuffer(channels, frameCount, sampleRate);
+        var myArrayBuffer = audioCtx.createBuffer(channels, buffer.length, sampleRate);
+
+          for (var channel = 0; channel < channels; channel++) {
+            // This gives us the actual array that contains the data
+            var nowBuffering = myArrayBuffer.getChannelData(channel);
+            for (var i = 0; i < buffer.length; i++) {
+                // audio needs to be in [-1.0; 1.0]
+                nowBuffering[i] = bufferFloat[i];
+            }
+        }
+
+        // Get an AudioBufferSourceNode.
+        // This is the AudioNode to use when we want to play an AudioBuffer
+        var source = audioCtx.createBufferSource();
+        // set the buffer in the AudioBufferSourceNode
+        source.buffer = myArrayBuffer;
+        // connect the AudioBufferSourceNode to the
+        // destination so we can hear the sound
+        source.connect(audioCtx.destination);
+        // start the source playing
+        source.start();
+    
+        // source.onended = () => {
+        //     console.log('White noise finished');
+        // }
+    });
+}
+
+    // openBtn.onclick = function () {
+    //     // Fill the buffer with white noise;
+    //     //just random values between -1.0 and 1.0
+    //     for (var channel = 0; channel < channels; channel++) {
+    //         // This gives us the actual array that contains the data
+    //         var nowBuffering = myArrayBuffer.getChannelData(channel);
+    //         for (var i = 0; i < frameCount; i++) {
+    //             // Math.random() is in [0; 1.0]
+    //             // audio needs to be in [-1.0; 1.0]
+    //             nowBuffering[i] = Math.random() * 2 - 1;
+    //         }
+    //     }
+
+    // }
+
+
+</script>
+
+</html>
